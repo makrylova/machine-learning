@@ -1,0 +1,97 @@
+---
+title: "project_mlearning"
+author: "marina"
+date: "February 19, 2016"
+output: html_document
+---
+###Background
+ 
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+ 
+ 
+### Data preprocessing
+The training data for this project are available here:
+ 
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+ 
+The test data are available here:
+ 
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+ 
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har.
+ 
+First, we download and read csv files:
+```{r}
+#reading csv files
+#options(install.packages.check.source = "no", "repos"="http://cran.us.r-project.org")
+#install.packages(pkgs = "caret",dependencies = c("Depends", "Imports"))
+training <- read.csv("pml-training.csv", row.names = 1)
+testing <- read.csv("pml-testing.csv",  row.names = 1)
+#str(testing)
+#str(training)
+```
+Here is the list of all packages used for this analysis:
+```{r}
+library(caret)
+library(ggplot2)
+library(lattice)
+library(kernlab)
+library(randomForest)
+```
+Next, we are going to clean up the data. First, all the variables with almost no variation are identified and removed:
+ 
+```{r}
+#identifying columns to delete
+set.seed(123)
+todelete <- nearZeroVar(training)
+#deleting columns
+training_fixed <- training[-todelete]
+testing_fixed <- testing[-todelete]
+```
+ 
+All the variables with all missing values are removed, as well as irrelevant variable not useful for our analysis - timestamp:
+ 
+```{r}
+# Deleting columns with all missing values
+training_fixed<-training_fixed[,colSums(is.na(training_fixed)) == 0]
+testing_fixed <-testing_fixed[,colSums(is.na(testing_fixed)) == 0]
+#deleting irrelevant variable
+training_fixed$cvtd_timestamp<- NULL
+testing_fixed$cvtd_timestamp<- NULL
+```
+###Modeling
+First, we are going to subdivide training dataset into training and validation (for cross validation) subsets. Assigning 80% of observations to training subset
+```{r}
+#partitioning training dataset into training and validation subsets
+partition <- createDataPartition(training_fixed$classe,p=.8,list=FALSE)
+trainingfinal <- training_fixed[partition,]
+crossvalidation <- training_fixed[-partition,]
+```
+Next, we are going to fit the random forest model and calculate predicted values
+```{r}
+#building random forest model
+randomforestmodel <- randomForest(classe ~ ., data = trainingfinal)
+predicted_values<-predict(randomforestmodel,trainingfinal)
+```
+Below is the confusion matrix for training dataset:
+```{r}
+#printing confusion matrix
+print(confusionMatrix(predicted_values, trainingfinal$classe))
+```
+Accuracy is very high for training dataset.
+Next stage is cross validation. We are going to predict values from validation dataset using our model and print out the confusion matrix:
+```{r}
+#cross validating
+predicted_validation<-predict(randomforestmodel,crossvalidation )
+print(confusionMatrix(predicted_validation, crossvalidation$classe))
+```
+Accuracy is also high for cross validation. Therefore, the model is acceptable.
+ 
+###Prediction
+The last stage is to predict classe variable for testing dataset using our model:
+ 
+```{r}
+#testing
+predicted_testing<-predict(randomforestmodel,testing_fixed )
+predicted_testing
+```
